@@ -17,6 +17,10 @@ const defaultTicket = {
 const newTicket = ref({ ...defaultTicket })
 const tickets = ref([])
 
+const openTicketsCount = computed(() => {
+  return tickets.value.filter((ticket) => ticket.status === 'Open').length
+})
+
 const filteredTickets = computed(() => {
   return tickets.value.filter((ticket) => {
     const matchesSearch =
@@ -92,7 +96,7 @@ onMounted(() => {
         <a class="nav-item" href="#">
           <span class="nav-icon">□</span>
           Tickets
-          <span class="nav-count">12</span>
+          <span class="nav-count">{{ openTicketsCount }}</span>
         </a>
 
         <a class="nav-item" href="#">
@@ -173,7 +177,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <div v-if="showTicketForm" class="ticket-form-card">
+        <div v-if="showTicketForm" class="panel">
           <div class="panel-heading">
             <div>
               <h2>Create a new ticket</h2>
@@ -181,35 +185,27 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="ticket-form">
-            <div class="form-field">
-              <label>Subject</label>
+          <div class="ticket-toolbar">
+            <div class="search-box">
               <input v-model="newTicket.subject" type="text" placeholder="Customer issue" />
             </div>
 
-            <div class="form-field">
-              <label>Customer</label>
+            <div class="search-box">
               <input v-model="newTicket.customer" type="text" placeholder="Jane Doe" />
             </div>
 
-            <div class="form-field">
-              <label>Status</label>
-              <select v-model="newTicket.status">
-                <option>Open</option>
-                <option>In Progress</option>
-                <option>Resolved</option>
-              </select>
-            </div>
+            <select v-model="newTicket.status" class="filter-select">
+              <option>Open</option>
+              <option>In Progress</option>
+              <option>Resolved</option>
+            </select>
 
-            <div class="form-field">
-              <label>Priority</label>
-              <select v-model="newTicket.priority">
-                <option>Urgent</option>
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
-              </select>
-            </div>
+            <select v-model="newTicket.priority" class="filter-select">
+              <option>Urgent</option>
+              <option>High</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select>
           </div>
 
           <div class="ticket-form-actions">
@@ -233,7 +229,7 @@ onMounted(() => {
               <span class="stat-label">Open tickets</span>
               <span class="stat-icon orange">◷</span>
             </div>
-            <strong class="stat-value">42</strong>
+            <strong class="stat-value">{{ openTicketsCount }}</strong>
             <span class="stat-change positive">↓ 8.2% <small>vs last month</small></span>
           </div>
 
@@ -313,7 +309,7 @@ onMounted(() => {
                     class="status-badge"
                     :class="ticket.status.toLowerCase().replace(' ', '-')"
                   >
-                    {{ ticket.status }}
+                    {{ ticket.status === 'Open' ? 'Open ticket' : ticket.status }}
                   </span>
                 </div>
 
