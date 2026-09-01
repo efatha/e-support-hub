@@ -6,7 +6,7 @@ const error = ref('')
 
 onMounted(async () => {
   try {
-    const response = await fetch('/api/hello')
+    const response = await fetch('/api/home')
     if (!response.ok) {
       throw new Error(`Request failed: ${response.status}`)
     }
