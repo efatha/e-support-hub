@@ -1,10 +1,10 @@
-package com.efatha.e_support_hub;
+package com.efatha.e_support_hub_backend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class ESupportHubApplicationTests {
+class ESupportHubBackendApplicationTests {
 
 	@Test
 	void contextLoads() {
