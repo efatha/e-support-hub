@@ -9,9 +9,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 public class Home {
-    
     @GetMapping("/home")
-    public Map<String, String> HomeController(){
+    public Map<String, String> HomeController() {
       return Map.of("message", "Welcome to E-Support Hub Backend!");
     }
 }

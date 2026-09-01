@@ -1,48 +1,21 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import api from './services/api'
 
 const query = ref('')
 const activeFilter = ref('All')
 const apiStatus = ref('Checking API...')
+const showTicketForm = ref(false)
 
-const tickets = ref([
-  {
-    id: '#1048',
-    subject: 'Unable to reset password',
-    customer: 'Sarah Johnson',
-    initials: 'SJ',
-    status: 'Open',
-    priority: 'High',
-    time: '12 min ago'
-  },
-  {
-    id: '#1047',
-    subject: 'Invoice download is not working',
-    customer: 'David Smith',
-    initials: 'DS',
-    status: 'In Progress',
-    priority: 'Medium',
-    time: '45 min ago'
-  },
-  {
-    id: '#1046',
-    subject: 'Account successfully upgraded',
-    customer: 'Grace Williams',
-    initials: 'GW',
-    status: 'Resolved',
-    priority: 'Low',
-    time: '2 hours ago'
-  },
-  {
-    id: '#1045',
-    subject: 'Payment was charged twice',
-    customer: 'Michael Brown',
-    initials: 'MB',
-    status: 'Open',
-    priority: 'Urgent',
-    time: '3 hours ago'
-  }
-])
+const defaultTicket = {
+  subject: '',
+  customer: '',
+  status: 'Open',
+  priority: 'High'
+}
+
+const newTicket = ref({ ...defaultTicket })
+const tickets = ref([])
 
 const filteredTickets = computed(() => {
   return tickets.value.filter((ticket) => {
@@ -58,18 +31,45 @@ const filteredTickets = computed(() => {
   })
 })
 
-onMounted(async () => {
+const loadTickets = async () => {
   try {
-    const response = await fetch('/api/hello')
+    const response = await api.getDashboard()
+    tickets.value = response.tickets || []
+    apiStatus.value = 'API connected'
+  } catch (error) {
+    apiStatus.value = 'API offline'
+    tickets.value = []
+  }
+}
 
-    if (!response.ok) {
-      throw new Error('API request failed')
-    }
+const toggleTicketForm = () => {
+  showTicketForm.value = !showTicketForm.value
+}
 
+const submitTicket = async () => {
+  if (!newTicket.value.subject.trim() || !newTicket.value.customer.trim()) {
+    return
+  }
+
+  try {
+    const createdTicket = await api.createTicket({
+      subject: newTicket.value.subject.trim(),
+      customer: newTicket.value.customer.trim(),
+      status: newTicket.value.status,
+      priority: newTicket.value.priority
+    })
+
+    tickets.value = [createdTicket, ...tickets.value]
+    newTicket.value = { ...defaultTicket }
+    showTicketForm.value = false
     apiStatus.value = 'API connected'
   } catch (error) {
     apiStatus.value = 'API offline'
   }
+}
+
+onMounted(() => {
+  loadTickets()
 })
 </script>
 
@@ -167,10 +167,55 @@ onMounted(async () => {
             <p class="subtitle">Here is what is happening with your support team today.</p>
           </div>
 
-          <button class="primary-button">
+          <button class="primary-button" @click="toggleTicketForm">
             <span>+</span>
             New ticket
           </button>
+        </div>
+
+        <div v-if="showTicketForm" class="ticket-form-card">
+          <div class="panel-heading">
+            <div>
+              <h2>Create a new ticket</h2>
+              <p>Add a support request to the dashboard immediately.</p>
+            </div>
+          </div>
+
+          <div class="ticket-form">
+            <div class="form-field">
+              <label>Subject</label>
+              <input v-model="newTicket.subject" type="text" placeholder="Customer issue" />
+            </div>
+
+            <div class="form-field">
+              <label>Customer</label>
+              <input v-model="newTicket.customer" type="text" placeholder="Jane Doe" />
+            </div>
+
+            <div class="form-field">
+              <label>Status</label>
+              <select v-model="newTicket.status">
+                <option>Open</option>
+                <option>In Progress</option>
+                <option>Resolved</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label>Priority</label>
+              <select v-model="newTicket.priority">
+                <option>Urgent</option>
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="ticket-form-actions">
+            <button class="secondary-button" type="button" @click="showTicketForm = false">Cancel</button>
+            <button class="primary-button" type="button" @click="submitTicket">Save ticket</button>
+          </div>
         </div>
 
         <div class="stats-grid">
