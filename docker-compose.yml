@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./e-support-hub-backend
+    container_name: e-support-hub-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: e-support-hub-frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
