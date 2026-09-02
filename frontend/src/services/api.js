@@ -1,4 +1,4 @@
-const apiBaseUrl = import.meta.env.VITE_API_URL || ''
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://e-support-hub.onrender.com'
 
 const api = {
   async getTickets() {
