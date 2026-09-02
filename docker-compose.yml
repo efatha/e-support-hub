@@ -1,14 +1,36 @@
-version: "3.9"
-
 services:
+  postgres:
+    image: postgres@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    container_name: e-support-hub-postgres
+    environment:
+      POSTGRES_DB: e_support_hub
+      POSTGRES_USER: e_support_hub
+      POSTGRES_PASSWORD: e_support_hub
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data-v18:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U e_support_hub -d e_support_hub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./e-support-hub-backend
     container_name: e-support-hub-backend
     ports:
-      - "8080:8080"
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/e_support_hub
+      SPRING_DATASOURCE_USERNAME: e_support_hub
+      SPRING_DATASOURCE_PASSWORD: e_support_hub
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
 
   frontend:
     build:
@@ -18,3 +40,6 @@ services:
       - backend
     ports:
       - "80:80"
+
+volumes:
+  postgres-data-v18:

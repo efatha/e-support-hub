@@ -1,6 +1,13 @@
 package com.efatha.e_support_hub_backend;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "tickets")
 public class Ticket {
+    @Id
     private String id;
     private String subject;
     private String customer;

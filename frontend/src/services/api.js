@@ -1,6 +1,8 @@
+const apiBaseUrl = import.meta.env.VITE_API_URL || ''
+
 const api = {
   async getTickets() {
-    const response = await fetch('/api/tickets')
+    const response = await fetch(`${apiBaseUrl}/api/tickets`)
 
     if (!response.ok) {
       throw new Error('Could not load tickets')
@@ -10,7 +12,7 @@ const api = {
   },
 
   async getDashboard() {
-    const response = await fetch('/api/dashboard')
+    const response = await fetch(`${apiBaseUrl}/api/dashboard`)
 
     if (!response.ok) {
       throw new Error('Could not load dashboard')
@@ -20,7 +22,7 @@ const api = {
   },
 
   async createTicket(ticket) {
-    const response = await fetch('/api/tickets', {
+    const response = await fetch(`${apiBaseUrl}/api/tickets`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
