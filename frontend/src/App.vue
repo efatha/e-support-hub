@@ -43,6 +43,13 @@ const filteredTickets = computed(() => {
   })
 })
 
+const currentDate = new Date().toLocaleDateString('en-GB', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric'
+}).toUpperCase();
+
 const loadTickets = async () => {
   try {
     const response = await api.getDashboard()
@@ -167,7 +174,7 @@ onMounted(() => {
         <template v-if="activeView === 'dashboard'">
           <div class="page-heading">
             <div>
-              <p class="eyebrow">TUESDAY, SEPTEMBER 1, 2026</p>
+              <p class="eyebrow">{{currentDate}}</p>
               <h1>Good morning, Efatha</h1>
               <p class="subtitle">Here is what is happening with your support team today.</p>
             </div>
