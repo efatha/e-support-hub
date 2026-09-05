@@ -190,9 +190,9 @@ export default{
           <div class="page-heading">
             <div>
               <p class="eyebrow">{{currentDate}}</p>
-              <h1 v-if="currentTime >= '12:00'"> {{ afternoon }}, Efatha</h1>
-              <h1 v-else-if="currentTime <= '12:00'"> {{ morning }}, Efatha</h1>
-              <h1 v-else="currentTime >= '15:00'"> {{ evening }}, Efatha</h1>
+              <h1 v-if="currentTime <= '12:00' && currentTime > '00:00'"> {{ morning }}</h1>
+              <h1 v-else-if="currentTime >= '12:00' && currentTime < '15:10'"> {{ afternoon }}, Efatha</h1>
+              <h1 v-else-if="currentTime >= '15:10' && currentTime < '23:59'"> {{ evening }}, Efatha</h1>
               <p class="subtitle">Here is what is happening with your support team today.</p>
             </div>
 
