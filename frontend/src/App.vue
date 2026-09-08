@@ -1,12 +1,20 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import api from './services/api'
+
+const morning = 'Good Morning'
+const afternoon = 'Good Afternoon'
+const evening = 'Good Evening'
 
 const query = ref('')
 const activeFilter = ref('All')
 const apiStatus = ref('Checking API...')
 const showTicketForm = ref(false)
 const activeView = ref('dashboard')
+
+// Reactive timer to force recalculation of relative times every 60 seconds
+const nowTimer = ref(Date.now())
+let timerInterval = null
 
 const navItems = [
   { key: 'dashboard', label: 'Dashboard', icon: '▦' },
@@ -25,6 +33,24 @@ const defaultTicket = {
 const newTicket = ref({ ...defaultTicket })
 const tickets = ref([])
 
+// Helper functions for Local Storage persistence
+const getLocalTickets = () => {
+  try {
+    const saved = localStorage.getItem('e_support_tickets')
+    return saved ? JSON.parse(saved) : []
+  } catch (e) {
+    return []
+  }
+}
+
+const saveLocalTickets = (ticketList) => {
+  try {
+    localStorage.setItem('e_support_tickets', JSON.stringify(ticketList))
+  } catch (e) {
+    console.error('Failed to save to localStorage', e)
+  }
+}
+
 const openTicketsCount = computed(() => {
   return tickets.value.filter((ticket) => ticket.status === 'Open').length
 })
@@ -36,8 +62,7 @@ const filteredTickets = computed(() => {
       ticket.customer.toLowerCase().includes(query.value.toLowerCase())
 
     const matchesFilter =
-      activeFilter.value === 'All' ||
-      ticket.status === activeFilter.value
+      activeFilter.value === 'All' || ticket.status === activeFilter.value
 
     return matchesSearch && matchesFilter
   })
@@ -48,21 +73,69 @@ const currentDate = new Date().toLocaleDateString('en-GB', {
   day: 'numeric',
   month: 'long',
   year: 'numeric'
-}).toUpperCase();
+}).toUpperCase()
 
 const currentTime = new Date().toLocaleTimeString('en-GB', {
   hour: '2-digit',
   minute: '2-digit'
-}).toUpperCase();
+}).toUpperCase()
+
+// Calculates dynamic "X min ago" based on real ISO timestamps
+const formatTimeAgo = (rawDate, clientTime, fallbackString) => {
+  const currentNow = nowTimer.value
+  const targetDate = rawDate || clientTime
+
+  if (!targetDate) {
+    return fallbackString || 'just now'
+  }
+
+  const parsed = new Date(targetDate)
+  if (isNaN(parsed.getTime())) {
+    return targetDate
+  }
+
+  const seconds = Math.floor((currentNow - parsed.getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
+
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} month${months > 1 ? 's' : ''} ago`
+
+  const years = Math.floor(days / 365)
+  return `${years} year${years > 1 ? 's' : ''} ago`
+}
 
 const loadTickets = async () => {
+  const localSaved = getLocalTickets()
   try {
     const response = await api.getDashboard()
-    tickets.value = response.tickets || []
+    const fetchedTickets = response.tickets || []
+
+    // Merge API tickets with locally saved created tickets to avoid losing newly submitted data on refresh
+    const mergedMap = new Map()
+
+    // Process API tickets
+    fetchedTickets.forEach((t) => mergedMap.set(t.id, t))
+
+    // Overlay local tickets
+    localSaved.forEach((t) => mergedMap.set(t.id, t))
+
+    const mergedList = Array.from(mergedMap.values())
+    tickets.value = mergedList
+    saveLocalTickets(mergedList)
     apiStatus.value = 'API connected'
   } catch (error) {
     apiStatus.value = 'API offline'
-    tickets.value = []
+    // Fall back completely to localStorage if API is unreachable
+    tickets.value = localSaved
   }
 }
 
@@ -75,6 +148,8 @@ const submitTicket = async () => {
     return
   }
 
+  const nowIso = new Date().toISOString()
+
   try {
     const createdTicket = await api.createTicket({
       subject: newTicket.value.subject.trim(),
@@ -83,30 +158,55 @@ const submitTicket = async () => {
       priority: newTicket.value.priority
     })
 
-    tickets.value = [createdTicket, ...tickets.value]
+    const enrichedTicket = {
+      ...createdTicket,
+      createdAt: createdTicket.createdAt || nowIso,
+      clientCreatedTime: nowIso
+    }
+
+    const updatedList = [enrichedTicket, ...tickets.value]
+    tickets.value = updatedList
+    saveLocalTickets(updatedList)
+
     newTicket.value = { ...defaultTicket }
     showTicketForm.value = false
     apiStatus.value = 'API connected'
   } catch (error) {
+    // Graceful offline fallback: save locally even if backend fails
+    const offlineTicket = {
+      id: '#' + (1000 + tickets.value.length + 1),
+      subject: newTicket.value.subject.trim(),
+      customer: newTicket.value.customer.trim(),
+      initials: newTicket.value.customer.trim().substring(0, 2).toUpperCase(),
+      status: newTicket.value.status,
+      priority: newTicket.value.priority,
+      createdAt: nowIso,
+      clientCreatedTime: nowIso
+    }
+
+    const updatedList = [offlineTicket, ...tickets.value]
+    tickets.value = updatedList
+    saveLocalTickets(updatedList)
+
+    newTicket.value = { ...defaultTicket }
+    showTicketForm.value = false
     apiStatus.value = 'API offline'
   }
 }
 
 onMounted(() => {
   loadTickets()
+  // Ticker updates reactive timer every minute to continuously recalculate "X min ago"
+  timerInterval = setInterval(() => {
+    nowTimer.value = Date.now()
+  }, 60000)
+})
+
+onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval)
 })
 </script>
-<script>
-export default{
-  data(){
-    return{
-      morning: 'Good Morning',
-      afternoon: 'Good Afternoon',
-      evening: 'Good Evening',
-    };
-  }
-};
-</script>
+
 <template>
   <div class="app-shell">
     <aside class="sidebar">
@@ -189,10 +289,10 @@ export default{
         <template v-if="activeView === 'dashboard'">
           <div class="page-heading">
             <div>
-              <p class="eyebrow">{{currentDate}}</p>
-              <h1 v-if="currentTime <= '12:00' && currentTime > '00:00'"> {{ morning }}</h1>
-              <h1 v-else-if="currentTime >= '12:00' && currentTime < '15:10'"> {{ afternoon }}, Efatha</h1>
-              <h1 v-else-if="currentTime >= '15:10' && currentTime < '23:59'"> {{ evening }}, Efatha</h1>
+              <p class="eyebrow">{{ currentDate }}</p>
+              <h1 v-if="currentTime <= '12:00' && currentTime > '00:00'">{{ morning }}, Efatha</h1>
+              <h1 v-else-if="currentTime >= '12:00' && currentTime < '16:00'">{{ afternoon }}, Efatha</h1>
+              <h1 v-else-if="currentTime >= '16:00' && currentTime <= '23:59'">{{ evening }}, Efatha</h1>
               <p class="subtitle">Here is what is happening with your support team today.</p>
             </div>
 
@@ -348,7 +448,7 @@ export default{
                     </span>
                   </div>
 
-                  <span class="updated-time">{{ ticket.time }}</span>
+                  <span class="updated-time">{{ formatTimeAgo(ticket.createdAt, ticket.clientCreatedTime, ticket.time) }}</span>
                 </div>
 
                 <div v-if="filteredTickets.length === 0" class="empty-state">
@@ -462,7 +562,7 @@ export default{
                   </span>
                 </div>
 
-                <span class="updated-time">{{ ticket.time }}</span>
+                <span class="updated-time">{{ formatTimeAgo(ticket.createdAt, ticket.clientCreatedTime, ticket.time) }}</span>
               </div>
             </div>
           </div>
@@ -548,4 +648,3 @@ export default{
     </main>
   </div>
 </template>
-

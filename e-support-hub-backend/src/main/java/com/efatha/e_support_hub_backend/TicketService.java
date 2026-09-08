@@ -14,7 +14,7 @@ public class TicketService {
     }
 
     public List<Ticket> getTickets() {
-        return ticketRepository.findAllByOrderByIdDesc();
+        return ticketRepository.findAllByOrderByCreatedAtDesc();
     }
 
     public Ticket createTicket(Ticket ticket) {
