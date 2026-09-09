@@ -3,6 +3,7 @@ package com.efatha.e_support_hub_backend;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tickets")
@@ -14,74 +15,42 @@ public class Ticket {
     private String initials;
     private String status;
     private String priority;
-    private String time;
 
-    public Ticket() {
-    }
+    // Proper timestamp field
+    private LocalDateTime createdAt;
 
-    public Ticket(String id, String subject, String customer, String initials, String status, String priority, String time) {
+    public Ticket() {}
+
+    public Ticket(String id, String subject, String customer, String initials,
+                  String status, String priority, LocalDateTime createdAt) {
         this.id = id;
         this.subject = subject;
         this.customer = customer;
         this.initials = initials;
         this.status = status;
         this.priority = priority;
-        this.time = time;
+        this.createdAt = createdAt;
     }
 
-    public String getId() {
-        return id;
-    }
+    // getters and setters
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    public String getSubject() { return subject; }
+    public void setSubject(String subject) { this.subject = subject; }
 
-    public String getSubject() {
-        return subject;
-    }
+    public String getCustomer() { return customer; }
+    public void setCustomer(String customer) { this.customer = customer; }
 
-    public void setSubject(String subject) {
-        this.subject = subject;
-    }
+    public String getInitials() { return initials; }
+    public void setInitials(String initials) { this.initials = initials; }
 
-    public String getCustomer() {
-        return customer;
-    }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public void setCustomer(String customer) {
-        this.customer = customer;
-    }
+    public String getPriority() { return priority; }
+    public void setPriority(String priority) { this.priority = priority; }
 
-    public String getInitials() {
-        return initials;
-    }
-
-    public void setInitials(String initials) {
-        this.initials = initials;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getPriority() {
-        return priority;
-    }
-
-    public void setPriority(String priority) {
-        this.priority = priority;
-    }
-
-    public String getTime() {
-        return time;
-    }
-
-    public void setTime(String time) {
-        this.time = time;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
