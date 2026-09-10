@@ -285,7 +285,7 @@ onUnmounted(() => {
 
           <button class="icon-button">?</button>
           <button class="icon-button notification-button">
-            ♢
+            🔔
             <span class="notification-dot"></span>
           </button>
           <div class="avatar avatar-purple">EA</div>
