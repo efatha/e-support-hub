@@ -55,6 +55,10 @@ const openTicketsCount = computed(() => {
   return tickets.value.filter((ticket) => ticket.status === 'Open').length
 })
 
+const totalTicketsCount = computed(() => {
+  return tickets.value.length
+})
+
 const filteredTickets = computed(() => {
   return tickets.value.filter((ticket) => {
     const matchesSearch =
@@ -80,62 +84,89 @@ const currentTime = new Date().toLocaleTimeString('en-GB', {
   minute: '2-digit'
 }).toUpperCase()
 
-// Calculates dynamic "X min ago" based on real ISO timestamps
-const formatTimeAgo = (rawDate, clientTime, fallbackString) => {
+// Calculates "Just now", "1 min ago", "2 min ago", etc.
+const formatTimeAgo = (rawDate) => {
+  if (!rawDate) {
+    return 'Just now'
+  }
+
+  // Database format:
+  // 2026-09-10 08:32:27.671618
+  // Convert it to a JavaScript-compatible ISO format.
+  const normalizedDate = rawDate.replace(' ', 'T')
+
+  const createdAt = new Date(normalizedDate).getTime()
   const currentNow = nowTimer.value
-  const targetDate = rawDate || clientTime
 
-  if (!targetDate) {
-    return fallbackString || 'just now'
+  if (Number.isNaN(createdAt)) {
+    return 'Just now'
   }
 
-  const parsed = new Date(targetDate)
-  if (isNaN(parsed.getTime())) {
-    return targetDate
+  const differenceInSeconds = Math.floor(
+    (currentNow - createdAt) / 1000
+  )
+
+  // Less than 1 minute
+  if (differenceInSeconds < 60) {
+    return 'Just now'
   }
 
-  const seconds = Math.floor((currentNow - parsed.getTime()) / 1000)
-  if (seconds < 60) return 'just now'
+  // 1 minute and above
+  const minutes = Math.floor(differenceInSeconds / 60)
 
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes} min ago`
+  // Show minutes until 59 minutes
+  if (minutes < 60) {
+    return `${minutes} min ago`
+  }
 
+  // 1 hour and above
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
 
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  }
+
+  // 1 day and above
   const days = Math.floor(hours / 24)
-  if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
 
+  if (days < 7) {
+    return `${days} day${days === 1 ? '' : 's'} ago`
+  }
+
+  // 1 week and above
+  const weeks = Math.floor(days / 7)
+
+  if (weeks < 4) {
+    return `${weeks} week${weeks === 1 ? '' : 's'} ago`
+  }
+
+  // 1 month and above
   const months = Math.floor(days / 30)
-  if (months < 12) return `${months} month${months > 1 ? 's' : ''} ago`
 
+  if (months < 12) {
+    return `${months} month${months === 1 ? '' : 's'} ago`
+  }
+
+  // 1 year and above
   const years = Math.floor(days / 365)
-  return `${years} year${years > 1 ? 's' : ''} ago`
+
+  return `${years} year${years === 1 ? '' : 's'} ago`
 }
 
 const loadTickets = async () => {
-  const localSaved = getLocalTickets()
   try {
     const response = await api.getDashboard()
-    const fetchedTickets = response.tickets || []
 
-    // Merge API tickets with locally saved created tickets to avoid losing newly submitted data on refresh
-    const mergedMap = new Map()
+    tickets.value = response.tickets || []
 
-    // Process API tickets
-    fetchedTickets.forEach((t) => mergedMap.set(t.id, t))
+    // LocalStorage is only a cache of the backend data.
+    saveLocalTickets(tickets.value)
 
-    // Overlay local tickets
-    localSaved.forEach((t) => mergedMap.set(t.id, t))
-
-    const mergedList = Array.from(mergedMap.values())
-    tickets.value = mergedList
-    saveLocalTickets(mergedList)
     apiStatus.value = 'API connected'
   } catch (error) {
-    apiStatus.value = 'API offline'
-    // Fall back completely to localStorage if API is unreachable
-    tickets.value = localSaved
+    console.error('Failed to load tickets:', error)
+
+    apiStatus.value = 'API unavailable'
   }
 }
 
@@ -144,11 +175,12 @@ const toggleTicketForm = () => {
 }
 
 const submitTicket = async () => {
-  if (!newTicket.value.subject.trim() || !newTicket.value.customer.trim()) {
+  if (
+    !newTicket.value.subject.trim() ||
+    !newTicket.value.customer.trim()
+  ) {
     return
   }
-
-  const nowIso = new Date().toISOString()
 
   try {
     const createdTicket = await api.createTicket({
@@ -158,39 +190,25 @@ const submitTicket = async () => {
       priority: newTicket.value.priority
     })
 
-    const enrichedTicket = {
-      ...createdTicket,
-      createdAt: createdTicket.createdAt || nowIso,
-      clientCreatedTime: nowIso
-    }
+    const updatedList = [
+      createdTicket,
+      ...tickets.value
+    ]
 
-    const updatedList = [enrichedTicket, ...tickets.value]
     tickets.value = updatedList
+
+    // Save the backend response as the local cache.
     saveLocalTickets(updatedList)
 
     newTicket.value = { ...defaultTicket }
+
     showTicketForm.value = false
+
     apiStatus.value = 'API connected'
   } catch (error) {
-    // Graceful offline fallback: save locally even if backend fails
-    const offlineTicket = {
-      id: '#' + (1000 + tickets.value.length + 1),
-      subject: newTicket.value.subject.trim(),
-      customer: newTicket.value.customer.trim(),
-      initials: newTicket.value.customer.trim().substring(0, 2).toUpperCase(),
-      status: newTicket.value.status,
-      priority: newTicket.value.priority,
-      createdAt: nowIso,
-      clientCreatedTime: nowIso
-    }
+    console.error('Failed to create ticket:', error)
 
-    const updatedList = [offlineTicket, ...tickets.value]
-    tickets.value = updatedList
-    saveLocalTickets(updatedList)
-
-    newTicket.value = { ...defaultTicket }
-    showTicketForm.value = false
-    apiStatus.value = 'API offline'
+    apiStatus.value = 'API unavailable'
   }
 }
 
@@ -199,7 +217,7 @@ onMounted(() => {
   // Ticker updates reactive timer every minute to continuously recalculate "X min ago"
   timerInterval = setInterval(() => {
     nowTimer.value = Date.now()
-  }, 60000)
+  }, 6000)
 })
 
 onUnmounted(() => {
@@ -345,7 +363,7 @@ onUnmounted(() => {
                 <span class="stat-label">Total tickets</span>
                 <span class="stat-icon blue">□</span>
               </div>
-              <strong class="stat-value">248</strong>
+              <strong class="stat-value">{{ totalTicketsCount }}</strong>
               <span class="stat-change positive">↑ 12.5% <small>vs last month</small></span>
             </div>
 
@@ -448,7 +466,7 @@ onUnmounted(() => {
                     </span>
                   </div>
 
-                  <span class="updated-time">{{ formatTimeAgo(ticket.createdAt, ticket.clientCreatedTime, ticket.time) }}</span>
+                  <span class="updated-time">{{ formatTimeAgo(ticket.createdAt) }}</span>
                 </div>
 
                 <div v-if="filteredTickets.length === 0" class="empty-state">
@@ -562,7 +580,7 @@ onUnmounted(() => {
                   </span>
                 </div>
 
-                <span class="updated-time">{{ formatTimeAgo(ticket.createdAt, ticket.clientCreatedTime, ticket.time) }}</span>
+                <span class="updated-time">{{ formatTimeAgo(ticket.createdAt) }}</span>
               </div>
             </div>
           </div>

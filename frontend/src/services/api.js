@@ -12,15 +12,35 @@ const api = {
   },
 
   async getDashboard() {
-    const response = await fetch(`${apiBaseUrl}/api/dashboard`)
+    try {
+      const url = `${apiBaseUrl}/api/dashboard`
 
-    if (!response.ok) {
-      throw new Error('Could not load dashboard')
+      console.log('Calling dashboard API:', url)
+
+      const response = await fetch(url)
+
+      console.log('Dashboard status:', response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+
+        console.error('Dashboard API response:', errorText)
+
+        throw new Error(
+            `Dashboard API returned ${response.status} ${response.statusText}`
+        )
+      }
+
+      const data = await response.json()
+
+      console.log('Dashboard data:', data)
+
+      return data
+    } catch (error) {
+      console.error('Dashboard API ERROR:', error)
+      throw error
     }
-
-    return response.json()
   },
-
   async createTicket(ticket) {
     const response = await fetch(`${apiBaseUrl}/api/tickets`, {
       method: 'POST',
