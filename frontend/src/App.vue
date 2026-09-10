@@ -84,72 +84,61 @@ const currentTime = new Date().toLocaleTimeString('en-GB', {
   minute: '2-digit'
 }).toUpperCase()
 
-// Calculates "Just now", "1 min ago", "2 min ago", etc.
-const formatTimeAgo = (rawDate) => {
+const parseTicketDate = (rawDate) => {
   if (!rawDate) {
-    return 'Just now'
+    return null
   }
-
-  // Database format:
+  // Convert:
   // 2026-09-10 08:32:27.671618
-  // Convert it to a JavaScript-compatible ISO format.
+  // into:
+  // 2026-09-10T08:32:27.671618
   const normalizedDate = rawDate.replace(' ', 'T')
 
-  const createdAt = new Date(normalizedDate).getTime()
-  const currentNow = nowTimer.value
+  const timestamp = new Date(normalizedDate).getTime()
 
-  if (Number.isNaN(createdAt)) {
+  return Number.isNaN(timestamp) ? null : timestamp
+}
+
+const formatTimeAgo = (rawDate) => {
+  const createdAt = parseTicketDate(rawDate)
+
+  if (createdAt === null) {
     return 'Just now'
   }
 
   const differenceInSeconds = Math.floor(
-    (currentNow - createdAt) / 1000
+    (nowTimer.value - createdAt) / 1000
   )
 
-  // Less than 1 minute
   if (differenceInSeconds < 60) {
     return 'Just now'
   }
-
-  // 1 minute and above
   const minutes = Math.floor(differenceInSeconds / 60)
-
-  // Show minutes until 59 minutes
   if (minutes < 60) {
     return `${minutes} min ago`
   }
 
-  // 1 hour and above
   const hours = Math.floor(minutes / 60)
-
   if (hours < 24) {
     return `${hours} hour${hours === 1 ? '' : 's'} ago`
   }
 
-  // 1 day and above
   const days = Math.floor(hours / 24)
-
   if (days < 7) {
     return `${days} day${days === 1 ? '' : 's'} ago`
   }
 
-  // 1 week and above
   const weeks = Math.floor(days / 7)
-
   if (weeks < 4) {
     return `${weeks} week${weeks === 1 ? '' : 's'} ago`
   }
 
-  // 1 month and above
   const months = Math.floor(days / 30)
-
   if (months < 12) {
     return `${months} month${months === 1 ? '' : 's'} ago`
   }
 
-  // 1 year and above
   const years = Math.floor(days / 365)
-
   return `${years} year${years === 1 ? '' : 's'} ago`
 }
 
@@ -217,7 +206,7 @@ onMounted(() => {
   // Ticker updates reactive timer every minute to continuously recalculate "X min ago"
   timerInterval = setInterval(() => {
     nowTimer.value = Date.now()
-  }, 6000)
+  }, 1000)
 })
 
 onUnmounted(() => {
