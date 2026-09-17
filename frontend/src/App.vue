@@ -32,6 +32,12 @@ const defaultTicket = {
 
 const newTicket = ref({ ...defaultTicket })
 const tickets = ref([])
+const notificationCount = ref(0)
+const notifications = ref([])
+const showNotificationPanel = ref(false)
+
+const notificationStorageKey = 'e_support_notifications'
+const notificationRetentionMs = 7 * 24 * 60 * 60 * 1000
 
 // Helper functions for Local Storage persistence
 const getLocalTickets = () => {
@@ -49,6 +55,49 @@ const saveLocalTickets = (ticketList) => {
   } catch (e) {
     console.error('Failed to save to localStorage', e)
   }
+}
+
+const getLocalNotifications = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(notificationStorageKey) || '[]')
+    const cutoff = Date.now() - notificationRetentionMs
+    const recent = saved.filter((notification) => {
+      const createdAt = new Date(notification.createdAt).getTime()
+      return !Number.isNaN(createdAt) && createdAt >= cutoff
+    })
+
+    localStorage.setItem(notificationStorageKey, JSON.stringify(recent))
+    return recent
+  } catch (error) {
+    return []
+  }
+}
+
+const saveLocalNotifications = (notificationList) => {
+  try {
+    localStorage.setItem(notificationStorageKey, JSON.stringify(notificationList))
+  } catch (error) {
+    console.error('Failed to save notifications to localStorage', error)
+  }
+}
+
+const mergeNotifications = (serverNotifications) => {
+  const notificationByTicket = new Map()
+
+  for (const notification of [...getLocalNotifications(), ...serverNotifications]) {
+    const key = notification.ticketId || notification.id
+    notificationByTicket.set(key, {
+      ...notification,
+      read: notification.read === true
+    })
+  }
+
+  const merged = [...notificationByTicket.values()]
+    .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt))
+
+  notifications.value = merged
+  saveLocalNotifications(merged)
+  notificationCount.value = merged.filter((notification) => !notification.read).length
 }
 
 const openTicketsCount = computed(() => {
@@ -194,6 +243,7 @@ const submitTicket = async () => {
     showTicketForm.value = false
 
     apiStatus.value = 'API connected'
+    await loadNotifications()
   } catch (error) {
     console.error('Failed to create ticket:', error)
 
@@ -216,18 +266,14 @@ onUnmounted(() => {
   window.removeEventListener('click', closeNotificationPanel)
 })
 
-const notificationCount = ref(0)
-const notifications = ref([])
-const showNotificationPanel = ref(false)
-
 const loadNotifications = async () => {
   try {
     const data = await api.getNotifications()
 
-    notificationCount.value = data.count || 0
-    notifications.value = data.notifications || []
+    mergeNotifications(data.notifications || [])
   } catch (error) {
     console.error('Failed to load notifications:', error)
+    mergeNotifications([])
   }
 }
 
@@ -239,6 +285,12 @@ const toggleNotificationPanel = async () => {
 
     if (notificationCount.value > 0) {
       await api.markNotificationsRead()
+      const readNotifications = notifications.value.map((notification) => ({
+        ...notification,
+        read: true
+      }))
+      notifications.value = readNotifications
+      saveLocalNotifications(readNotifications)
       notificationCount.value = 0
     }
   }

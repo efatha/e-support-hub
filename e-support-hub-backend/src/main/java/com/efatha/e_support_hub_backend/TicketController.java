@@ -34,7 +34,6 @@ public class TicketController {
     @PostMapping("/tickets")
     public Ticket createTicket(@RequestBody Ticket ticket) {
         Ticket savedTicket = ticketService.createTicket(ticket);
-        notificationService.notifyTicketCreation(savedTicket); // 🔔 trigger notification
         return savedTicket;
     }
 

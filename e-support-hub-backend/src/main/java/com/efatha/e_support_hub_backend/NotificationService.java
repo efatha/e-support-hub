@@ -13,7 +13,14 @@ public class NotificationService {
     private final List<Notification> notifications = new ArrayList<>();
     private final AtomicLong nextId = new AtomicLong(1);
 
-    public void notifyTicketCreation(Ticket ticket) {
+    public synchronized void notifyTicketCreation(Ticket ticket) {
+        boolean alreadyNotified = notifications.stream()
+                .anyMatch(notification -> notification.getTicketId().equals(ticket.getId()));
+
+        if (alreadyNotified) {
+            return;
+        }
+
         String customer = ticket.getCustomer() == null || ticket.getCustomer().isBlank()
                 ? "there"
                 : ticket.getCustomer();
