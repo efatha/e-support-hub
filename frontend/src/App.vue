@@ -203,6 +203,8 @@ const submitTicket = async () => {
 
 onMounted(() => {
   loadTickets()
+  loadNotifications()
+  window.addEventListener('click', closeNotificationPanel)
   // Ticker updates reactive timer every minute to continuously recalculate "X min ago"
   timerInterval = setInterval(() => {
     nowTimer.value = Date.now()
@@ -211,7 +213,40 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval)
+  window.removeEventListener('click', closeNotificationPanel)
 })
+
+const notificationCount = ref(0)
+const notifications = ref([])
+const showNotificationPanel = ref(false)
+
+const loadNotifications = async () => {
+  try {
+    const data = await api.getNotifications()
+
+    notificationCount.value = data.count || 0
+    notifications.value = data.notifications || []
+  } catch (error) {
+    console.error('Failed to load notifications:', error)
+  }
+}
+
+const toggleNotificationPanel = async () => {
+  showNotificationPanel.value = !showNotificationPanel.value
+
+  if (showNotificationPanel.value) {
+    await loadNotifications()
+
+    if (notificationCount.value > 0) {
+      await api.markNotificationsRead()
+      notificationCount.value = 0
+    }
+  }
+}
+
+const closeNotificationPanel = () => {
+  showNotificationPanel.value = false
+}
 </script>
 
 <template>
@@ -284,10 +319,28 @@ onUnmounted(() => {
           </div>
 
           <button class="icon-button">?</button>
-          <button class="icon-button notification-button">
-            🔔
-            <span class="notification-dot"></span>
-          </button>
+          <div class="notification-wrapper" @click.stop>
+            <button class="icon-button notification-button" @click="toggleNotificationPanel">
+              🔔
+              <span v-if="notificationCount > 0" class="notification-count">{{ notificationCount }}</span>
+            </button>
+
+            <div v-if="showNotificationPanel" class="notification-panel" @click.stop>
+              <div class="notification-panel-heading">Notifications</div>
+
+              <div v-if="notifications.length === 0" class="notification-empty">
+                No notifications yet.
+              </div>
+
+              <div
+                v-for="notification in notifications"
+                :key="notification.id"
+                class="notification-card"
+              >
+                {{ notification.message }}
+              </div>
+            </div>
+          </div>
           <div class="avatar avatar-purple">EA</div>
         </div>
       </header>

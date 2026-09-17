@@ -10,9 +10,11 @@ import java.util.List;
 public class TicketService {
 
     private final TicketRepository ticketRepository;
+    private final NotificationService notificationService;
 
-    public TicketService(TicketRepository ticketRepository) {
+    public TicketService(TicketRepository ticketRepository, NotificationService notificationService) {
         this.ticketRepository = ticketRepository;
+        this.notificationService = notificationService;
         seedTickets();
     }
 
@@ -77,7 +79,11 @@ public class TicketService {
         /*
          * Save this ticket as a NEW database record.
          */
-        return ticketRepository.save(ticket);
+        Ticket savedTicket = ticketRepository.save(ticket);
+
+        notificationService.notifyTicketCreation(savedTicket);
+
+        return savedTicket;
     }
 
     private String generateNextTicketId() {

@@ -11,9 +11,11 @@ import java.util.Map;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final NotificationService notificationService; // ✅ add this
 
-    public TicketController(TicketService ticketService) {
+    public TicketController(TicketService ticketService, NotificationService notificationService) {
         this.ticketService = ticketService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping("/dashboard")
@@ -31,6 +33,36 @@ public class TicketController {
 
     @PostMapping("/tickets")
     public Ticket createTicket(@RequestBody Ticket ticket) {
-        return ticketService.createTicket(ticket);
+        Ticket savedTicket = ticketService.createTicket(ticket);
+        notificationService.notifyTicketCreation(savedTicket); // 🔔 trigger notification
+        return savedTicket;
+    }
+
+    @GetMapping("/notifications")
+    public Map<String, Object> getNotifications() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("count", notificationService.getUnreadCount());
+        response.put("notifications", notificationService.getNotifications());
+        return response;
+    }
+
+    @PostMapping("/notifications/read")
+    public Map<String, Object> markNotificationsRead() {
+        notificationService.markAllAsRead();
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("count", notificationService.getUnreadCount());
+        response.put("notifications", notificationService.getNotifications());
+        return response;
+    }
+
+    @DeleteMapping("/notifications")
+    public Map<String, Object> clearNotifications() {
+        notificationService.clearNotifications();
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("count", notificationService.getUnreadCount());
+        response.put("notifications", notificationService.getNotifications());
+        return response;
     }
 }

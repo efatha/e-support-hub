@@ -55,6 +55,28 @@ const api = {
     }
 
     return response.json()
+  },
+
+  async getNotifications() {
+    const response = await fetch(`${apiBaseUrl}/api/notifications`)
+
+    if (!response.ok) {
+      throw new Error('Could not load notifications')
+    }
+
+    return response.json()
+  },
+
+  async markNotificationsRead() {
+    const response = await fetch(`${apiBaseUrl}/api/notifications/read`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      throw new Error('Could not update notifications')
+    }
+
+    return response.json()
   }
 }
 
