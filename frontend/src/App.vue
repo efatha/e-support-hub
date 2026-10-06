@@ -31,6 +31,50 @@ const defaultTicket = {
 }
 
 const newTicket = ref({ ...defaultTicket })
+const ticketErrors = ref({})
+
+const settingsStorageKey = 'e_support_settings'
+
+const defaultSettings = {
+  workspaceName: 'SupportFlow',
+  supportEmail: '',
+  displayName: 'Efatha',
+  timezone: 'Africa/Nairobi',
+  defaultStatus: 'Open',
+  defaultPriority: 'High',
+  notifyOnNewTicket: true
+}
+
+const timezoneOptions = [
+  'Africa/Nairobi',
+  'Africa/Lagos',
+  'Europe/London',
+  'Europe/Paris',
+  'Asia/Dubai',
+  'Asia/Kolkata',
+  'America/New_York',
+  'America/Los_Angeles',
+  'UTC'
+]
+
+const settings = ref({ ...defaultSettings })
+const settingsForm = ref({ ...defaultSettings })
+const settingsErrors = ref({})
+const settingsMessage = ref('')
+
+const userInitials = computed(() => {
+  const parts = settings.value.displayName.trim().split(/\s+/).filter(Boolean)
+
+  if (parts.length === 0) {
+    return 'EA'
+  }
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+})
 const tickets = ref([])
 const notificationCount = ref(0)
 const notifications = ref([])
@@ -245,22 +289,45 @@ const loadTickets = async () => {
   }
 }
 
+const freshTicket = () => ({
+  subject: '',
+  customer: '',
+  status: settings.value.defaultStatus || defaultTicket.status,
+  priority: settings.value.defaultPriority || defaultTicket.priority
+})
+
 const toggleTicketForm = () => {
+  if (!showTicketForm.value && !newTicket.value.subject && !newTicket.value.customer) {
+    newTicket.value = freshTicket()
+  }
+
+  ticketErrors.value = {}
   showTicketForm.value = !showTicketForm.value
 }
 
 const submitTicket = async () => {
-  if (
-    !newTicket.value.subject.trim() ||
-    !newTicket.value.customer.trim()
-  ) {
+  const subject = newTicket.value.subject.trim()
+  const customer = newTicket.value.customer.trim()
+  const errors = {}
+
+  if (!subject) {
+    errors.subject = 'Subject is required.'
+  }
+
+  if (!customer) {
+    errors.customer = 'Customer name is required.'
+  }
+
+  ticketErrors.value = errors
+
+  if (subject === '' || customer === '') {
     return
   }
 
   try {
     const createdTicket = await api.createTicket({
-      subject: newTicket.value.subject.trim(),
-      customer: newTicket.value.customer.trim(),
+      subject,
+      customer,
       status: newTicket.value.status,
       priority: newTicket.value.priority
     })
@@ -275,7 +342,8 @@ const submitTicket = async () => {
     // Save the backend response as the local cache.
     saveLocalTickets(updatedList)
 
-    newTicket.value = { ...defaultTicket }
+    newTicket.value = freshTicket()
+    ticketErrors.value = {}
 
     showTicketForm.value = false
 
@@ -288,7 +356,97 @@ const submitTicket = async () => {
   }
 }
 
+const loadSettings = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(settingsStorageKey) || 'null')
+
+    if (saved && typeof saved === 'object') {
+      settings.value = { ...defaultSettings, ...saved }
+    }
+  } catch (error) {
+    settings.value = { ...defaultSettings }
+  }
+
+  settingsForm.value = { ...settings.value }
+}
+
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+
+const openSettings = () => {
+  if (activeView.value !== 'settings') {
+    settingsForm.value = { ...settings.value }
+    settingsErrors.value = {}
+    settingsMessage.value = ''
+  }
+
+  activeView.value = 'settings'
+}
+
+const clearSettingsFeedback = (field) => {
+  settingsMessage.value = ''
+
+  if (!settingsErrors.value[field]) {
+    return
+  }
+
+  const nextErrors = { ...settingsErrors.value }
+  delete nextErrors[field]
+  settingsErrors.value = nextErrors
+}
+
+const saveSettings = () => {
+  const next = {
+    workspaceName: settingsForm.value.workspaceName.trim(),
+    supportEmail: settingsForm.value.supportEmail.trim(),
+    displayName: settingsForm.value.displayName.trim(),
+    timezone: settingsForm.value.timezone,
+    defaultStatus: settingsForm.value.defaultStatus,
+    defaultPriority: settingsForm.value.defaultPriority,
+    notifyOnNewTicket: Boolean(settingsForm.value.notifyOnNewTicket)
+  }
+  const errors = {}
+
+  if (!next.workspaceName) {
+    errors.workspaceName = 'Workspace name is required.'
+  }
+
+  if (!next.supportEmail) {
+    errors.supportEmail = 'Support email is required.'
+  } else if (!isValidEmail(next.supportEmail)) {
+    errors.supportEmail = 'Enter a valid email address.'
+  }
+
+  if (!next.displayName) {
+    errors.displayName = 'Display name is required.'
+  }
+
+  if (!next.timezone) {
+    errors.timezone = 'Timezone is required.'
+  }
+
+  if (!next.defaultStatus) {
+    errors.defaultStatus = 'Default status is required.'
+  }
+
+  if (!next.defaultPriority) {
+    errors.defaultPriority = 'Default priority is required.'
+  }
+
+  settingsErrors.value = errors
+  settingsMessage.value = ''
+
+  if (Object.keys(errors).length > 0) {
+    return
+  }
+
+  settings.value = next
+  settingsForm.value = { ...next }
+  localStorage.setItem(settingsStorageKey, JSON.stringify(next))
+  settingsMessage.value = 'Settings saved.'
+}
+
 onMounted(() => {
+  loadSettings()
   loadTickets()
   loadNotifications()
   window.addEventListener('click', closeNotificationPanel)
@@ -366,10 +524,15 @@ const closeNotificationPanel = () => {
       <div class="workspace-label settings-label">MANAGE</div>
 
       <nav class="navigation">
-        <a class="nav-item" href="#">
+        <button
+          type="button"
+          class="nav-item"
+          :class="{ active: activeView === 'settings' }"
+          @click="openSettings"
+        >
           <span class="nav-icon">⚙</span>
           Settings
-        </a>
+        </button>
       </nav>
 
       <div class="sidebar-bottom">
@@ -381,9 +544,9 @@ const closeNotificationPanel = () => {
         </div>
 
         <div class="user-card">
-          <div class="avatar avatar-purple">EA</div>
+          <div class="avatar avatar-purple">{{ userInitials }}</div>
           <div>
-            <strong>Efatha</strong>
+            <strong>{{ settings.displayName }}</strong>
             <span>Administrator</span>
           </div>
           <span class="more-icon">•••</span>
@@ -430,7 +593,7 @@ const closeNotificationPanel = () => {
               </div>
             </div>
           </div>
-          <div class="avatar avatar-purple">EA</div>
+          <div class="avatar avatar-purple">{{ userInitials }}</div>
         </div>
       </header>
 
@@ -439,9 +602,9 @@ const closeNotificationPanel = () => {
           <div class="page-heading">
             <div>
               <p class="eyebrow">{{ currentDate }}</p>
-              <h1 v-if="currentTime <= '12:00' && currentTime > '00:00'">{{ morning }}, Efatha</h1>
-              <h1 v-else-if="currentTime >= '12:00' && currentTime < '16:00'">{{ afternoon }}, Efatha</h1>
-              <h1 v-else-if="currentTime >= '16:00' && currentTime <= '23:59'">{{ evening }}, Efatha</h1>
+              <h1 v-if="currentTime <= '12:00' && currentTime > '00:00'">{{ morning }}, {{ settings.displayName }}</h1>
+              <h1 v-else-if="currentTime >= '12:00' && currentTime < '16:00'">{{ afternoon }}, {{ settings.displayName }}</h1>
+              <h1 v-else-if="currentTime >= '16:00' && currentTime <= '23:59'">{{ evening }}, {{ settings.displayName }}</h1>
               <p class="subtitle">Here is what is happening with your support team today.</p>
             </div>
 
@@ -459,33 +622,59 @@ const closeNotificationPanel = () => {
               </div>
             </div>
 
-            <div class="ticket-toolbar">
-              <div class="search-box">
-                <input v-model="newTicket.subject" type="text" placeholder="Customer issue" />
+            <form class="settings-grid" novalidate @submit.prevent="submitTicket">
+              <label class="settings-field">
+                <span>Subject <span class="required-mark" aria-hidden="true">*</span></span>
+                <input
+                  v-model="newTicket.subject"
+                  type="text"
+                  placeholder="Customer issue"
+                  aria-required="true"
+                  :aria-invalid="Boolean(ticketErrors.subject)"
+                  :class="{ invalid: ticketErrors.subject }"
+                  @input="ticketErrors.subject = ''"
+                />
+                <small v-if="ticketErrors.subject" class="field-error">{{ ticketErrors.subject }}</small>
+              </label>
+
+              <label class="settings-field">
+                <span>Customer <span class="required-mark" aria-hidden="true">*</span></span>
+                <input
+                  v-model="newTicket.customer"
+                  type="text"
+                  placeholder="Jane Doe"
+                  aria-required="true"
+                  :aria-invalid="Boolean(ticketErrors.customer)"
+                  :class="{ invalid: ticketErrors.customer }"
+                  @input="ticketErrors.customer = ''"
+                />
+                <small v-if="ticketErrors.customer" class="field-error">{{ ticketErrors.customer }}</small>
+              </label>
+
+              <label class="settings-field">
+                <span>Status</span>
+                <select v-model="newTicket.status">
+                  <option>Open</option>
+                  <option>In Progress</option>
+                  <option>Resolved</option>
+                </select>
+              </label>
+
+              <label class="settings-field">
+                <span>Priority</span>
+                <select v-model="newTicket.priority">
+                  <option>Urgent</option>
+                  <option>High</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </label>
+
+              <div class="span-2 ticket-form-actions">
+                <button class="secondary-button" type="button" @click="showTicketForm = false">Cancel</button>
+                <button class="primary-button" type="submit">Save ticket</button>
               </div>
-
-              <div class="search-box">
-                <input v-model="newTicket.customer" type="text" placeholder="Jane Doe" />
-              </div>
-
-              <select v-model="newTicket.status" class="filter-select">
-                <option>Open</option>
-                <option>In Progress</option>
-                <option>Resolved</option>
-              </select>
-
-              <select v-model="newTicket.priority" class="filter-select">
-                <option>Urgent</option>
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
-              </select>
-            </div>
-
-            <div class="ticket-form-actions">
-              <button class="secondary-button" type="button" @click="showTicketForm = false">Cancel</button>
-              <button class="primary-button" type="button" @click="submitTicket">Save ticket</button>
-            </div>
+            </form>
           </div>
 
           <div class="stats-grid">
@@ -663,7 +852,7 @@ const closeNotificationPanel = () => {
                 <div class="activity-item">
                   <div class="activity-avatar purple-avatar">EA</div>
                   <div>
-                    <p><strong>Efatha</strong> created a new team</p>
+                    <p><strong>{{ settings.displayName }}</strong> created a new team</p>
                     <span>2 hours ago</span>
                   </div>
                 </div>
@@ -812,6 +1001,147 @@ const closeNotificationPanel = () => {
               <span class="stat-change positive">↑ 3.7% <small>vs last month</small></span>
             </div>
           </div>
+        </template>
+
+        <template v-else-if="activeView === 'settings'">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">MANAGE</p>
+              <h1>Settings</h1>
+              <p class="subtitle">Workspace details used for tickets, greetings, and notifications.</p>
+            </div>
+          </div>
+
+          <form class="settings-layout" novalidate @submit.prevent="saveSettings">
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Workspace</h2>
+                  <p>Required details for this support workspace.</p>
+                </div>
+              </div>
+
+              <div class="settings-grid">
+                <label class="settings-field">
+                  <span>Workspace name <span class="required-mark" aria-hidden="true">*</span></span>
+                  <input
+                    v-model="settingsForm.workspaceName"
+                    type="text"
+                    placeholder="SupportFlow"
+                    autocomplete="organization"
+                    aria-required="true"
+                    :aria-invalid="Boolean(settingsErrors.workspaceName)"
+                    :class="{ invalid: settingsErrors.workspaceName }"
+                    @input="clearSettingsFeedback('workspaceName')"
+                  />
+                  <small v-if="settingsErrors.workspaceName" class="field-error">{{ settingsErrors.workspaceName }}</small>
+                </label>
+
+                <label class="settings-field">
+                  <span>Support email <span class="required-mark" aria-hidden="true">*</span></span>
+                  <input
+                    v-model="settingsForm.supportEmail"
+                    type="email"
+                    placeholder="support@company.com"
+                    autocomplete="email"
+                    aria-required="true"
+                    :aria-invalid="Boolean(settingsErrors.supportEmail)"
+                    :class="{ invalid: settingsErrors.supportEmail }"
+                    @input="clearSettingsFeedback('supportEmail')"
+                  />
+                  <small v-if="settingsErrors.supportEmail" class="field-error">{{ settingsErrors.supportEmail }}</small>
+                  <small v-else class="field-hint">Used when new-ticket notifications are on.</small>
+                </label>
+
+                <label class="settings-field">
+                  <span>Display name <span class="required-mark" aria-hidden="true">*</span></span>
+                  <input
+                    v-model="settingsForm.displayName"
+                    type="text"
+                    placeholder="Efatha"
+                    autocomplete="name"
+                    aria-required="true"
+                    :aria-invalid="Boolean(settingsErrors.displayName)"
+                    :class="{ invalid: settingsErrors.displayName }"
+                    @input="clearSettingsFeedback('displayName')"
+                  />
+                  <small v-if="settingsErrors.displayName" class="field-error">{{ settingsErrors.displayName }}</small>
+                </label>
+
+                <label class="settings-field">
+                  <span>Timezone <span class="required-mark" aria-hidden="true">*</span></span>
+                  <select
+                    v-model="settingsForm.timezone"
+                    aria-required="true"
+                    :aria-invalid="Boolean(settingsErrors.timezone)"
+                    :class="{ invalid: settingsErrors.timezone }"
+                    @change="clearSettingsFeedback('timezone')"
+                  >
+                    <option v-for="zone in timezoneOptions" :key="zone" :value="zone">{{ zone }}</option>
+                  </select>
+                  <small v-if="settingsErrors.timezone" class="field-error">{{ settingsErrors.timezone }}</small>
+                </label>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Ticket defaults</h2>
+                  <p>Applied the next time you create a ticket.</p>
+                </div>
+              </div>
+
+              <div class="settings-grid">
+                <label class="settings-field">
+                  <span>Default status <span class="required-mark" aria-hidden="true">*</span></span>
+                  <select
+                    v-model="settingsForm.defaultStatus"
+                    aria-required="true"
+                    :aria-invalid="Boolean(settingsErrors.defaultStatus)"
+                    :class="{ invalid: settingsErrors.defaultStatus }"
+                    @change="clearSettingsFeedback('defaultStatus')"
+                  >
+                    <option>Open</option>
+                    <option>In Progress</option>
+                    <option>Resolved</option>
+                  </select>
+                  <small v-if="settingsErrors.defaultStatus" class="field-error">{{ settingsErrors.defaultStatus }}</small>
+                </label>
+
+                <label class="settings-field">
+                  <span>Default priority <span class="required-mark" aria-hidden="true">*</span></span>
+                  <select
+                    v-model="settingsForm.defaultPriority"
+                    aria-required="true"
+                    :aria-invalid="Boolean(settingsErrors.defaultPriority)"
+                    :class="{ invalid: settingsErrors.defaultPriority }"
+                    @change="clearSettingsFeedback('defaultPriority')"
+                  >
+                    <option>Urgent</option>
+                    <option>High</option>
+                    <option>Medium</option>
+                    <option>Low</option>
+                  </select>
+                  <small v-if="settingsErrors.defaultPriority" class="field-error">{{ settingsErrors.defaultPriority }}</small>
+                </label>
+
+                <label class="settings-check span-2">
+                  <input v-model="settingsForm.notifyOnNewTicket" type="checkbox" />
+                  <span>
+                    <strong>Email me when a ticket is created</strong>
+                    <small>Sends a notice to the support email.</small>
+                  </span>
+                </label>
+              </div>
+            </section>
+
+            <div class="settings-actions">
+              <p class="settings-required-note">Fields marked with * are required.</p>
+              <span v-if="settingsMessage" class="settings-saved" role="status">{{ settingsMessage }}</span>
+              <button class="primary-button" type="submit">Save settings</button>
+            </div>
+          </form>
         </template>
       </section>
     </main>
