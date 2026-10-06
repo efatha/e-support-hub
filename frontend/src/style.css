@@ -817,8 +817,8 @@ h1 {
   .table-row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "title title"
-      "customer updated"
+      "title updated"
+      "customer customer"
       "status priority";
     align-items: start;
     gap: 8px 12px;
@@ -834,6 +834,11 @@ h1 {
   .customer {
     grid-area: customer;
   }
+  .customer span {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+  }
   .table-row > :nth-child(3) {
     grid-area: status;
   }
@@ -845,6 +850,7 @@ h1 {
     grid-area: updated;
     margin-top: 0;
     text-align: right;
+    white-space: nowrap;
   }
 }
 @media (max-width: 1050px) {
