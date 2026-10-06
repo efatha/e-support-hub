@@ -592,6 +592,40 @@ h1 {
   font-size: 12px;
   text-align: center;
 }
+.ticket-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 16px;
+}
+.page-button {
+  min-width: 34px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #e5e8ef;
+  border-radius: 7px;
+  background: white;
+  color: #717b91;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+.page-button.active {
+  border-color: #6259e6;
+  background: #6259e6;
+  color: white;
+}
+.page-button:hover:not(.active) {
+  border-color: #c9c6f5;
+  color: #6259e6;
+}
+.page-ellipsis {
+  color: #a1a8b8;
+  font-size: 11px;
+  font-weight: 700;
+}
 .activity-list {
   display: grid;
   gap: 22px;

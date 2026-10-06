@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import api from './services/api'
 
 const morning = 'Good Morning'
@@ -119,6 +119,43 @@ const filteredTickets = computed(() => {
 
     return matchesSearch && matchesFilter
   })
+})
+
+const ticketsPerPage = 5
+const recentTicketsPage = ref(1)
+
+const recentTicketsPageCount = computed(() => {
+  return Math.max(1, Math.ceil(filteredTickets.value.length / ticketsPerPage))
+})
+
+const recentTickets = computed(() => {
+  const page = Math.min(recentTicketsPage.value, recentTicketsPageCount.value)
+  const start = (page - 1) * ticketsPerPage
+  return filteredTickets.value.slice(start, start + ticketsPerPage)
+})
+
+const recentTicketPages = computed(() => {
+  const total = recentTicketsPageCount.value
+  const current = Math.min(recentTicketsPage.value, total)
+
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, index) => index + 1)
+  }
+
+  const visible = new Set([1, total, current, current - 1, current + 1])
+  return [...visible]
+    .filter((page) => page >= 1 && page <= total)
+    .sort((first, second) => first - second)
+})
+
+watch([query, activeFilter], () => {
+  recentTicketsPage.value = 1
+})
+
+watch(recentTicketsPageCount, (pageCount) => {
+  if (recentTicketsPage.value > pageCount) {
+    recentTicketsPage.value = pageCount
+  }
 })
 
 const currentDate = new Date().toLocaleDateString('en-GB', {
@@ -527,7 +564,7 @@ const closeNotificationPanel = () => {
                 </div>
 
                 <div
-                  v-for="ticket in filteredTickets"
+                  v-for="ticket in recentTickets"
                   :key="ticket.id"
                   class="table-row"
                 >
@@ -567,6 +604,26 @@ const closeNotificationPanel = () => {
                   No tickets match your search.
                 </div>
               </div>
+
+              <nav
+                v-if="recentTicketsPageCount > 1"
+                class="ticket-pagination"
+                aria-label="Recent tickets pages"
+              >
+                <template v-for="(page, index) in recentTicketPages" :key="page">
+                  <span
+                    v-if="index > 0 && page - recentTicketPages[index - 1] > 1"
+                    class="page-ellipsis"
+                  >…</span>
+                  <button
+                    type="button"
+                    class="page-button"
+                    :class="{ active: page === recentTicketsPage }"
+                    :aria-current="page === recentTicketsPage ? 'page' : undefined"
+                    @click="recentTicketsPage = page"
+                  >({{ page }})</button>
+                </template>
+              </nav>
             </section>
 
             <section class="panel activity-panel">
